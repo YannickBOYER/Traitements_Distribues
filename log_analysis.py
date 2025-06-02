@@ -12,9 +12,11 @@ host = sys.argv[1]
 port = int(sys.argv[2])
 output_path = sys.argv[3]
 
+# Crée le contexte Spark et Streaming (batch de 1 s)
 sc = SparkContext(appName="LogAnalysisMinimal")
 ssc = StreamingContext(sc, batchDuration=1)
 
+# Flux de lignes depuis la socket
 lines = ssc.socketTextStream(host, port)
 
 # Fenêtre glissante de 60 s, pas de chevauchement (slide=60)
@@ -22,7 +24,7 @@ windowed = lines.window(windowDuration=60, slideDuration=60)
 
 def process_rdd(rdd):
     """
-    Pour chaque RDD de 60 s : compte total et erreurs, calcule le taux,
+    Pour chaque RDD : compte total et erreurs, calcule le taux,
     et écrit une ligne horodatée dans output_path.
     """
     count_total = rdd.count()
@@ -44,9 +46,11 @@ def process_rdd(rdd):
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     output_line = f"{timestamp}, total={count_total}, errors={count_err}, error_rate={rate:.2f}%\n"
 
+    # Append au fichier local
     with open(output_path, "a") as f:
         f.write(output_line)
 
+# Applique process_rdd à chaque fenêtre
 windowed.foreachRDD(process_rdd)
 
 ssc.start()
