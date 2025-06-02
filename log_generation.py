@@ -1,4 +1,5 @@
 import random
+import datetime
 import time
 
 # Liste d'exemples d'URLs
@@ -8,7 +9,7 @@ URLS = [
 ]
 
 # Codes HTTP avec pondération
-STATUS_CODES = [200, 201, 401, 404, 500, 501, 503, 504]
+STATUS_CODES = [200, 201, 301, 302, 400, 401, 403, 404, 500, 502, 503]
 
 # Générer une adresse IP aléatoire
 def random_ip():
@@ -17,9 +18,11 @@ def random_ip():
 # Générer une ligne de log type Apache
 def generate_log_line():
     ip = random_ip()
+    timestamp = datetime.datetime.utcnow().strftime("%d/%b/%Y:%H:%M:%S +0000")
+    method = random.choice(["GET", "POST", "PUT", "DELETE"])
     url = random.choice(URLS)
     status = random.choice(STATUS_CODES)
-    return f'{ip} - - [30/May/2025:10:00:00 +0000] "GET {url} HTTP/1.1" {status} -'
+    return f'{ip} - - [{timestamp}] "{method} {url} HTTP/1.1" {status} -'
 
 # Boucle principale
 def main():
