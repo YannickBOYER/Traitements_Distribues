@@ -1,6 +1,6 @@
 # Traitements distribués
 
-Ce dépôt contient un exemple complet de génération et d'analyse de logs HTTP à l'aide de Kafka et de Spark Streaming.
+Ce dépôt contient un projet d'analyse de logs HTTP à l'aide de Kafka et de Spark Streaming.
 
 ## Prérequis
 
