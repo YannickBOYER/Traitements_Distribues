@@ -19,7 +19,7 @@ ERROR_STATUS = [400, 401, 403, 404, 500, 502, 503]
 
 def random_ip():
     # Ici, seulement des IPs de la plage 192.168.10.x pour avoir un nombre d'utilisateurs limité afin de créer des alertes
-    return f"192.168.10.{random.randint(0, 255)}"
+    return f"192.168.10.{random.randint(1, 254)}"
 
 def parse_args():
     p = argparse.ArgumentParser(
