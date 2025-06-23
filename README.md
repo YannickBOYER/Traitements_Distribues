@@ -32,13 +32,13 @@ Il est également possible de tester les scripts sans Docker :
 1. Générez des logs et exposez-les sur un port :
 
    ```bash
-   python log_generation.py | nc -lk 9999
+   python log_generation_complete.py
    ```
 
 2. Dans une autre fenêtre, lancez l'analyse en streaming :
 
    ```bash
-   spark-submit log_analysis.py localhost 9999 results.txt
+   spark-submit log_analysis_complete.py
    ```
 
 Les statistiques seront ajoutées dans le fichier `results.txt` toutes les minutes.
@@ -51,10 +51,3 @@ Les statistiques seront ajoutées dans le fichier `results.txt` toutes les minut
 - `spark/` : image Docker contenant différents scripts d'analyse avec Spark.
 - `docker-compose.yml` : orchestration complète Zookeeper/Kafka + générateur + analyseur.
 
-## Documentation
-
-Le document `07_projet.pdf` décrit plus en détail l'objectif et la mise en œuvre du projet.
-
-## Licence
-
-Ce projet est distribué sous la licence MIT.
