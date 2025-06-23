@@ -1,0 +1,92 @@
+# Docker compose for a kafka
+version: '3.8'
+
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    container_name: zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+      ZOOKEEPER_SYNC_LIMIT: 2
+    networks:
+      - traitements_distrib
+    
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    container_name: kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+    networks:
+      - traitements_distrib
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+  
+  init-kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    container_name: init-kafka
+    depends_on:
+      - kafka
+    entrypoint: ["/bin/sh", "-c"]
+    command: >
+      "
+      echo 'Waiting for Kafka to be ready...' &&
+      until kafka-topics --bootstrap-server kafka:9092 --list 2>/dev/null; do
+        echo 'Kafka is not ready yet, waiting...' &&
+        sleep 5;
+      done &&
+      echo 'Creating kafka topics' &&
+      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic http-logs --partitions 1 --replication-factor 1 &&
+      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic alerts --partitions 1 --replication-factor 1 &&
+      echo 'Kafka topics created successfully.'
+      "
+    networks:
+      - traitements_distrib
+    
+  log-generator:
+    build:
+      context: ./log_generator
+      dockerfile: Dockerfile
+    container_name: log-generator
+    depends_on:
+      - kafka
+    environment:
+      KAFKA_BROKER: kafka:9092
+    volumes:
+      - ./log_generator/app:/app
+    networks:
+      - traitements_distrib
+    command: |
+      sh -c "sleep 30 && python /app/log_generation_complete.py --kafka-broker kafka:9092 --topic http-logs --rate 100 --error-user-percent 20 --error-rate 50 --error-url-percent 20"
+
+  spark-streaming:
+    build:
+      context: ./spark
+      dockerfile: Dockerfile
+    container_name: spark-streaming
+    depends_on:
+      - kafka
+    networks:
+      - traitements_distrib
+    command: |
+      sh -c "sleep 30 && spark-submit --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.5 /app/log_analysis_complete.py"
+
+volumes:
+  kafka-data:
+  
+networks:
+  traitements_distrib:
+    driver: bridge
