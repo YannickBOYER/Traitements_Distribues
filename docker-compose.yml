@@ -50,12 +50,27 @@ services:
       done &&
       echo 'Creating kafka topics' &&
       kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic http-logs --partitions 1 --replication-factor 1 &&
+      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic http-logs-monitoring --partitions 1 --replication-factor 1 &&
       kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic alerts --partitions 1 --replication-factor 1 &&
       echo 'Kafka topics created successfully.'
       "
     networks:
       - traitements_distrib
     
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui
+    depends_on:
+      - kafka
+    ports:
+      - "8080:8080"
+    environment:
+      - KAFKA_CLUSTERS_0_NAME=Kafka
+      - KAFKA_CLUSTERS_0_BOOTSTRAP_SERVERS=kafka:9092
+      - KAFKA_CLUSTERS_0_ZOOKEEPER_CONNECT=zookeeper:2181
+    networks:
+      - traitements_distrib
+
   log-generator:
     build:
       context: ./log_generator
@@ -84,8 +99,26 @@ services:
     command: |
       sh -c "sleep 30 && spark-submit --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.5 /app/log_analysis_complete.py"
 
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    depends_on:
+      - kafka
+      - kafka-ui
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_INSTALL_PLUGINS=dalelane-kafka-datasource
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/config.ini:/etc/grafana/grafana.ini
+      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
+    networks:
+      - traitements_distrib
+
 volumes:
   kafka-data:
+  grafana-data:
   
 networks:
   traitements_distrib:

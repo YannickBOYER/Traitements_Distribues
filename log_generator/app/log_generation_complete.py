@@ -1,6 +1,7 @@
 import time
 import random
 import argparse
+import json
 from datetime import datetime
 from kafka import KafkaProducer
 
@@ -99,10 +100,20 @@ def main():
                 f'{ip} - [{timestamp}] "{method} {url} HTTP/1.1" {status} {size}'
             )
 
+            line_json = {
+                "ip": ip,
+                "timestamp": timestamp,
+                "method": method,
+                "url": url,
+                "status": status,
+                "size": size
+            }
+
             # print(line, flush=True)
             # Envoi du log à Kafka
             try:
                 producer.send(args.topic, value=line)
+                producer.send(f'{args.topic}-monitoring', value=json.dumps(line_json))
             except Exception as e:
                 print(f"Erreur lors de l'envoi du log à Kafka: {e}")
             
