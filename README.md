@@ -12,7 +12,7 @@ Ce dépôt contient un projet d'analyse de logs HTTP à l'aide de Kafka et de Sp
 1. Construisez et démarrez l'ensemble des services :
 
    ```bash
-   docker compose up --build
+   docker compose up -d --build
    ```
 
    Les conteneurs suivants seront lancés :
