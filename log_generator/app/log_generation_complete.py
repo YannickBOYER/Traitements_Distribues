@@ -2,6 +2,7 @@ import time
 import random
 import argparse
 import json
+import os
 from datetime import datetime
 from kafka import KafkaProducer
 
@@ -42,8 +43,8 @@ def parse_args():
         "--error-url-percent", type=float, default=20.0,
         help="%% des URLs considérées comme 'à risque' générant potentiellement des erreurs"
     )
-    p.add_argument("--kafka-broker", type=str, default="localhost:9092",
-                   help="Adresse du broker Kafka, ex. localhost:9092")
+    p.add_argument("--kafka-broker", type=str, default="localhost:9093",
+                   help="Adresse du broker Kafka, ex. localhost:9093")
     p.add_argument("--topic", type=str, default="http-logs",
                    help="Nom du topic Kafka dans lequel produire les logs")
     
@@ -55,6 +56,10 @@ def main():
     sleep_time = 1.0 / args.rate
 
     # Prépare le producer Kafka
+    security_protocol = os.getenv("KAFKA_SECURITY_PROTOCOL", "PLAINTEXT")
+    ssl_cafile = os.getenv("KAFKA_SSL_CAFILE")
+    ssl_certfile = os.getenv("KAFKA_SSL_CERTFILE")
+    ssl_keyfile = os.getenv("KAFKA_SSL_KEYFILE")
     try:
         producer = KafkaProducer(
             bootstrap_servers=[args.kafka_broker],
@@ -62,7 +67,11 @@ def main():
             acks='all',
             retries=5,
             linger_ms=100,
-            batch_size=16384
+            batch_size=16384,
+            security_protocol=security_protocol,
+            ssl_cafile=ssl_cafile,
+            ssl_certfile=ssl_certfile,
+            ssl_keyfile=ssl_keyfile
         )
     except Exception as e:
         print(f"Erreur lors de la connexion à Kafka: {e}")

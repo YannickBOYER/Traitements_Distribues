@@ -2,6 +2,7 @@ apiVersion: 1
 
 datasources:
   - name: Prometheus
+    uid: PBFA97CFB590B2093
     type: prometheus
     access: proxy
     url: http://prometheus:9090
@@ -9,10 +10,11 @@ datasources:
     editable: true
 
   - name: Kafka
+    uid: PE4A5F92FD340ECCE
     type: hamedkarbasi93-kafka-datasource
     access: proxy
     jsonData:
       kafkaVersion: "2.7.0"
-      securityProtocol: PLAINTEXT
-      bootstrapServers: kafka:9092
+      securityProtocol: SSL
+      bootstrapServers: kafka:9093
     editable: true

@@ -3,6 +3,7 @@ from pyspark.sql.functions import *
 from pyspark.sql.types import *
 from datetime import datetime
 import json
+import os
 
 def create_spark_session():
     spark = SparkSession.builder \
@@ -13,11 +14,26 @@ def create_spark_session():
     return spark
 
 def connect_to_kafka(spark, kafka_brokers, topic):
-    df = spark.readStream \
+    reader = spark.readStream \
         .format("kafka") \
         .option("kafka.bootstrap.servers", kafka_brokers) \
-        .option("subscribe", topic) \
-        .load()
+        .option("subscribe", topic)
+
+    protocol = os.getenv("KAFKA_SECURITY_PROTOCOL", "PLAINTEXT")
+    if protocol != "PLAINTEXT":
+        reader = reader.option("kafka.security.protocol", protocol)
+        ts = os.getenv("KAFKA_SSL_TRUSTSTORE_LOCATION")
+        tsp = os.getenv("KAFKA_SSL_TRUSTSTORE_PASSWORD")
+        ks = os.getenv("KAFKA_SSL_KEYSTORE_LOCATION")
+        ksp = os.getenv("KAFKA_SSL_KEYSTORE_PASSWORD")
+        if ts and tsp:
+            reader = reader.option("kafka.ssl.truststore.location", ts)
+            reader = reader.option("kafka.ssl.truststore.password", tsp)
+        if ks and ksp:
+            reader = reader.option("kafka.ssl.keystore.location", ks)
+            reader = reader.option("kafka.ssl.keystore.password", ksp)
+
+    df = reader.load()
     return df
 
 def parse_logs(df):
@@ -112,12 +128,26 @@ def process_batch(batch_df, batch_id, spark, kafka_brokers, alerts_topic, thresh
     if alerts:
         print(f"Sending {len(alerts)} generated alerts to Kafka.")
         alerts_df = spark.createDataFrame([(json.dumps(alert),) for alert in alerts], ["value"])
-        alerts_df.write \
+        writer = alerts_df.write \
             .format("kafka") \
             .option("kafka.bootstrap.servers", kafka_brokers) \
-            .option("topic", alerts_topic) \
-            .mode("append") \
-            .save()
+            .option("topic", alerts_topic)
+
+        protocol = os.getenv("KAFKA_SECURITY_PROTOCOL", "PLAINTEXT")
+        if protocol != "PLAINTEXT":
+            writer = writer.option("kafka.security.protocol", protocol)
+            ts = os.getenv("KAFKA_SSL_TRUSTSTORE_LOCATION")
+            tsp = os.getenv("KAFKA_SSL_TRUSTSTORE_PASSWORD")
+            ks = os.getenv("KAFKA_SSL_KEYSTORE_LOCATION")
+            ksp = os.getenv("KAFKA_SSL_KEYSTORE_PASSWORD")
+            if ts and tsp:
+                writer = writer.option("kafka.ssl.truststore.location", ts)
+                writer = writer.option("kafka.ssl.truststore.password", tsp)
+            if ks and ksp:
+                writer = writer.option("kafka.ssl.keystore.location", ks)
+                writer = writer.option("kafka.ssl.keystore.password", ksp)
+
+        writer.mode("append").save()
 
 def main():
     thresholds = {
@@ -133,7 +163,7 @@ def main():
     try:
         # Connecting to Kafka
         print("Connecting to kafka...")
-        kafka_brokers = "kafka:9092"
+        kafka_brokers = os.getenv("KAFKA_BROKER", "kafka:9093")
         read_topic = "http-logs"
         alert_topic = "alerts"
         kafka_df = connect_to_kafka(spark, kafka_brokers, read_topic)

@@ -1,0 +1,28 @@
+apiVersion: 1
+groups:
+  - orgId: 1
+    name: kafka_alerts
+    folder: Kafka Alerts
+    interval: 1m
+    rules:
+      - uid: kafka_alerts_rule        
+        title: New Kafka Alert
+        editable: true
+        condition: A
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 60
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: increase(kafka_topic_partition_current_offset{topic="alerts"}[1m])
+              interval: ""
+              instant: true
+        noDataState: NoData
+        execErrState: Error
+        for: 0m
+        annotations:
+          summary: New alert message detected
+        labels:
+          severity: critical

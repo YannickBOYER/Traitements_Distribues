@@ -20,38 +20,47 @@ services:
     depends_on:
       - zookeeper
     ports:
-      - "9092:9092"
+      - "9093:9093"
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
-      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
-      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: SSL://kafka:9093
+      KAFKA_LISTENERS: SSL://0.0.0.0:9093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: SSL:SSL
+      KAFKA_INTER_BROKER_LISTENER_NAME: SSL
+      KAFKA_SSL_KEYSTORE_FILENAME: server.keystore.jks
+      KAFKA_SSL_TRUSTSTORE_FILENAME: server.truststore.jks
+      KAFKA_SSL_KEYSTORE_CREDENTIALS: credentials.txt
+      KAFKA_SSL_KEY_CREDENTIALS: credentials.txt
+      KAFKA_SSL_TRUSTSTORE_CREDENTIALS: credentials.txt
+      KAFKA_SSL_CLIENT_AUTH: required
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
     networks:
       - traitements_distrib
     volumes:
       - kafka-data:/var/lib/kafka/data
+      - ./certs/kafka:/etc/kafka/secrets:ro
   
   init-kafka:
     image: confluentinc/cp-kafka:7.4.0
     container_name: init-kafka
     depends_on:
       - kafka
+    volumes:
+      - ./certs/kafka:/etc/kafka/secrets:ro
     entrypoint: ["/bin/sh", "-c"]
     command: >
       "
       echo 'Waiting for Kafka to be ready...' &&
-      until kafka-topics --bootstrap-server kafka:9092 --list 2>/dev/null; do
+      until kafka-topics --bootstrap-server kafka:9093 --command-config /etc/kafka/secrets/client.properties --list 2>/dev/null; do
         echo 'Kafka is not ready yet, waiting...' &&
         sleep 5;
       done &&
       echo 'Creating kafka topics' &&
-      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic http-logs --partitions 1 --replication-factor 1 &&
-      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic http-logs-monitoring --partitions 1 --replication-factor 1 &&
-      kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic alerts --partitions 1 --replication-factor 1 &&
+      kafka-topics --bootstrap-server kafka:9093 --command-config /etc/kafka/secrets/client.properties --create --if-not-exists --topic http-logs --partitions 1 --replication-factor 1 &&
+      kafka-topics --bootstrap-server kafka:9093 --command-config /etc/kafka/secrets/client.properties --create --if-not-exists --topic http-logs-monitoring --partitions 1 --replication-factor 1 &&
+      kafka-topics --bootstrap-server kafka:9093 --command-config /etc/kafka/secrets/client.properties --create --if-not-exists --topic alerts --partitions 1 --replication-factor 1 &&
       echo 'Kafka topics created successfully.'
       "
     networks:
@@ -66,8 +75,19 @@ services:
       - "8080:8080"
     environment:
       - KAFKA_CLUSTERS_0_NAME=Kafka
-      - KAFKA_CLUSTERS_0_BOOTSTRAP_SERVERS=kafka:9092
+      - KAFKA_CLUSTERS_0_BOOTSTRAP_SERVERS=kafka:9093
       - KAFKA_CLUSTERS_0_ZOOKEEPER_CONNECT=zookeeper:2181
+      - KAFKA_CLUSTERS_0_PROPERTIES_SECURITY_PROTOCOL=SSL
+      - KAFKA_CLUSTERS_0_PROPERTIES_SSL_TRUSTSTORE_LOCATION=/certs/kafka/server.truststore.jks
+      - KAFKA_CLUSTERS_0_PROPERTIES_SSL_TRUSTSTORE_PASSWORD=changeit
+      # — keystore (présente le certif client) —
+      - KAFKA_CLUSTERS_0_PROPERTIES_SSL_KEYSTORE_LOCATION=/certs/kafka/client.keystore.jks
+      - KAFKA_CLUSTERS_0_PROPERTIES_SSL_KEYSTORE_PASSWORD=changeit
+      - KAFKA_CLUSTERS_0_PROPERTIES_SSL_KEY_PASSWORD=changeit
+      # (optionnel) désactive la vérification du CN si besoin
+      - KAFKA_CLUSTERS_0_PROPERTIES_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM=
+    volumes:
+      - ./certs/kafka:/certs/kafka:ro
     networks:
       - traitements_distrib
 
@@ -79,13 +99,18 @@ services:
     depends_on:
       - kafka
     environment:
-      KAFKA_BROKER: kafka:9092
+      KAFKA_BROKER: kafka:9093
+      KAFKA_SECURITY_PROTOCOL: SSL
+      KAFKA_SSL_CAFILE: /certs/kafka/ca.crt
+      KAFKA_SSL_CERTFILE: /certs/kafka/client.crt
+      KAFKA_SSL_KEYFILE: /certs/kafka/client.key
     volumes:
       - ./log_generator/app:/app
+      - ./certs/kafka:/certs/kafka:ro
     networks:
       - traitements_distrib
     command: |
-      sh -c "sleep 30 && python /app/log_generation_complete.py --kafka-broker kafka:9092 --topic http-logs --rate 100 --error-user-percent 20 --error-rate 50 --error-url-percent 20"
+      sh -c "sleep 30 && python /app/log_generation_complete.py --kafka-broker kafka:9093 --topic http-logs --rate 100 --error-user-percent 20 --error-rate 50 --error-url-percent 20"
 
   spark-streaming:
     build:
@@ -94,8 +119,17 @@ services:
     container_name: spark-streaming
     depends_on:
       - kafka
+    environment:
+      KAFKA_BROKER: kafka:9093
+      KAFKA_SECURITY_PROTOCOL: SSL
+      KAFKA_SSL_TRUSTSTORE_LOCATION: /certs/kafka/server.truststore.jks
+      KAFKA_SSL_TRUSTSTORE_PASSWORD: changeit
+      KAFKA_SSL_KEYSTORE_LOCATION: /certs/kafka/server.keystore.jks
+      KAFKA_SSL_KEYSTORE_PASSWORD: changeit
     networks:
       - traitements_distrib
+    volumes:
+      - ./certs/kafka:/certs/kafka:ro
     command: |
       sh -c "sleep 30 && spark-submit --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.5 /app/log_analysis_complete.py"
 
@@ -108,8 +142,25 @@ services:
       - kafka
     ports:
       - "9308:9308"
+    volumes:
+      - ./certs/kafka:/certs/kafka:ro
     command:
-      - --kafka.server=kafka:9092
+      - --kafka.server=kafka:9093
+      # Activation TLS
+      - --tls.enabled
+      # Chemin vers le fichier CA
+      - --tls.ca-file=/certs/kafka/ca.crt
+      # On ne vérifie pas le certificat car il est auto-signé
+      - --tls.insecure-skip-tls-verify
+
+      # ==== AJOUT MUTUAL TLS ====
+      # Certificat client que le broker va valider
+      - --tls.cert-file=/certs/kafka/client.crt
+      - --tls.key-file=/certs/kafka/client.key
+
+      # Doit matcher le CN/SAN de votre certif broker (CN=kafka)
+      - --tls.server-name=kafka
+
     restart: always
     networks:
       - traitements_distrib
@@ -138,12 +189,17 @@ services:
       - "3000:3000"
     environment:
       - GF_INSTALL_PLUGINS=hamedkarbasi93-kafka-datasource
+      - GF_SERVER_PROTOCOL=https
+      - GF_SERVER_CERT_FILE=/certs/grafana/server.crt
+      - GF_SERVER_CERT_KEY=/certs/grafana/server.key
     volumes:
       - grafana-data:/var/lib/grafana
       - ./grafana/config.ini:/etc/grafana/grafana.ini
       - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
       - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
       - ./grafana/dashboards:/etc/grafana/provisioning/dashboards/dashboards
+      - ./grafana/provisioning/alerting:/etc/grafana/provisioning/alerting
+      - ./certs/grafana:/certs/grafana:ro
     networks:
       - traitements_distrib
 
