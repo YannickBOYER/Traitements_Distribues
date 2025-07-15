@@ -55,8 +55,10 @@ KAFKA_PASSWORD=admin-secret
 Docker Compose charge automatiquement ces variables pour les conteneurs ayant besoin de se connecter à Kafka.
 
 Le broker Kafka utilise le fichier `kafka_server_jaas.conf` fourni dans
-`certs/kafka/`. Celui-ci contient les sections `KafkaServer` et `Client` afin de
-permettre l'authentification SASL/PLAIN et la connexion à Zookeeper.
+`certs/kafka/`. Celui-ci définit la section `KafkaServer` pour l'authentification
+SASL/PLAIN du broker. La connexion à Zookeeper reste non authentifiée et
+Kafka est lancé avec l'option `-Dzookeeper.sasl.client=false` pour ne pas tenter
+d'utiliser SASL avec Zookeeper.
 
 ## Arborescence
 
