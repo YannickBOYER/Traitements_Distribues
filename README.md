@@ -43,6 +43,17 @@ Il est également possible de tester les scripts sans Docker :
 
 Les statistiques seront ajoutées dans le fichier `results.txt` toutes les minutes.
 
+## Configuration de l'authentification Kafka
+
+Les services utilisent désormais l'authentification SASL/PLAIN en plus du SSL. Les identifiants sont renseignés dans le fichier `.env` :
+
+```bash
+KAFKA_USERNAME=admin
+KAFKA_PASSWORD=admin-secret
+```
+
+Docker Compose charge automatiquement ces variables pour les conteneurs ayant besoin de se connecter à Kafka.
+
 ## Arborescence
 
 - `log_generation.py` : générateur de logs simple envoyé sur la sortie standard.

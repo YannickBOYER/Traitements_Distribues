@@ -24,10 +24,13 @@ services:
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: SSL://kafka:9093
-      KAFKA_LISTENERS: SSL://0.0.0.0:9093
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: SSL:SSL
-      KAFKA_INTER_BROKER_LISTENER_NAME: SSL
+      KAFKA_ADVERTISED_LISTENERS: SASL_SSL://kafka:9093
+      KAFKA_LISTENERS: SASL_SSL://0.0.0.0:9093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: SASL_SSL:SASL_SSL
+      KAFKA_INTER_BROKER_LISTENER_NAME: SASL_SSL
+      KAFKA_SASL_ENABLED_MECHANISMS: PLAIN
+      KAFKA_SASL_MECHANISM_INTER_BROKER_PROTOCOL: PLAIN
+      KAFKA_OPTS: -Djava.security.auth.login.config=/etc/kafka/secrets/kafka_server_jaas.conf
       KAFKA_SSL_KEYSTORE_FILENAME: server.keystore.jks
       KAFKA_SSL_TRUSTSTORE_FILENAME: server.truststore.jks
       KAFKA_SSL_KEYSTORE_CREDENTIALS: credentials.txt
@@ -77,17 +80,21 @@ services:
       - KAFKA_CLUSTERS_0_NAME=Kafka
       - KAFKA_CLUSTERS_0_BOOTSTRAP_SERVERS=kafka:9093
       - KAFKA_CLUSTERS_0_ZOOKEEPER_CONNECT=zookeeper:2181
-      - KAFKA_CLUSTERS_0_PROPERTIES_SECURITY_PROTOCOL=SSL
+      - KAFKA_CLUSTERS_0_PROPERTIES_SECURITY_PROTOCOL=SASL_SSL
       - KAFKA_CLUSTERS_0_PROPERTIES_SSL_TRUSTSTORE_LOCATION=/certs/kafka/server.truststore.jks
       - KAFKA_CLUSTERS_0_PROPERTIES_SSL_TRUSTSTORE_PASSWORD=changeit
       # — keystore (présente le certif client) —
       - KAFKA_CLUSTERS_0_PROPERTIES_SSL_KEYSTORE_LOCATION=/certs/kafka/client.keystore.jks
       - KAFKA_CLUSTERS_0_PROPERTIES_SSL_KEYSTORE_PASSWORD=changeit
       - KAFKA_CLUSTERS_0_PROPERTIES_SSL_KEY_PASSWORD=changeit
+      - KAFKA_CLUSTERS_0_PROPERTIES_SASL_MECHANISM=PLAIN
+      - KAFKA_CLUSTERS_0_PROPERTIES_SASL_JAAS_CONFIG=org.apache.kafka.common.security.plain.PlainLoginModule required username=\"${KAFKA_USERNAME}\" password=\"${KAFKA_PASSWORD}\";
       # (optionnel) désactive la vérification du CN si besoin
       - KAFKA_CLUSTERS_0_PROPERTIES_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM=
     volumes:
       - ./certs/kafka:/certs/kafka:ro
+    env_file:
+      - .env
     networks:
       - traitements_distrib
 
@@ -100,13 +107,16 @@ services:
       - kafka
     environment:
       KAFKA_BROKER: kafka:9093
-      KAFKA_SECURITY_PROTOCOL: SSL
+      KAFKA_SECURITY_PROTOCOL: SASL_SSL
       KAFKA_SSL_CAFILE: /certs/kafka/ca.crt
       KAFKA_SSL_CERTFILE: /certs/kafka/client.crt
       KAFKA_SSL_KEYFILE: /certs/kafka/client.key
+      KAFKA_SASL_MECHANISM: PLAIN
     volumes:
       - ./log_generator/app:/app
       - ./certs/kafka:/certs/kafka:ro
+    env_file:
+      - .env
     networks:
       - traitements_distrib
     command: |
@@ -121,15 +131,18 @@ services:
       - kafka
     environment:
       KAFKA_BROKER: kafka:9093
-      KAFKA_SECURITY_PROTOCOL: SSL
+      KAFKA_SECURITY_PROTOCOL: SASL_SSL
       KAFKA_SSL_TRUSTSTORE_LOCATION: /certs/kafka/server.truststore.jks
       KAFKA_SSL_TRUSTSTORE_PASSWORD: changeit
       KAFKA_SSL_KEYSTORE_LOCATION: /certs/kafka/server.keystore.jks
       KAFKA_SSL_KEYSTORE_PASSWORD: changeit
+      KAFKA_SASL_MECHANISM: PLAIN
     networks:
       - traitements_distrib
     volumes:
       - ./certs/kafka:/certs/kafka:ro
+    env_file:
+      - .env
     command: |
       sh -c "sleep 30 && spark-submit --packages org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.5 /app/log_analysis_complete.py"
 
@@ -146,6 +159,10 @@ services:
       - ./certs/kafka:/certs/kafka:ro
     command:
       - --kafka.server=kafka:9093
+      - --sasl.enabled
+      - --sasl.mechanism=plain
+      - --sasl.username=${KAFKA_USERNAME}
+      - --sasl.password=${KAFKA_PASSWORD}
       # Activation TLS
       - --tls.enabled
       # Chemin vers le fichier CA
@@ -162,6 +179,8 @@ services:
       - --tls.server-name=kafka
 
     restart: always
+    env_file:
+      - .env
     networks:
       - traitements_distrib
     

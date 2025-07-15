@@ -32,6 +32,13 @@ def connect_to_kafka(spark, kafka_brokers, topic):
         if ks and ksp:
             reader = reader.option("kafka.ssl.keystore.location", ks)
             reader = reader.option("kafka.ssl.keystore.password", ksp)
+        mech = os.getenv("KAFKA_SASL_MECHANISM")
+        user = os.getenv("KAFKA_USERNAME")
+        pwd = os.getenv("KAFKA_PASSWORD")
+        if mech and user and pwd:
+            reader = reader.option("kafka.sasl.mechanism", mech)
+            jaas = f"org.apache.kafka.common.security.plain.PlainLoginModule required username=\"{user}\" password=\"{pwd}\";"
+            reader = reader.option("kafka.sasl.jaas.config", jaas)
 
     df = reader.load()
     return df
@@ -146,6 +153,13 @@ def process_batch(batch_df, batch_id, spark, kafka_brokers, alerts_topic, thresh
             if ks and ksp:
                 writer = writer.option("kafka.ssl.keystore.location", ks)
                 writer = writer.option("kafka.ssl.keystore.password", ksp)
+            mech = os.getenv("KAFKA_SASL_MECHANISM")
+            user = os.getenv("KAFKA_USERNAME")
+            pwd = os.getenv("KAFKA_PASSWORD")
+            if mech and user and pwd:
+                writer = writer.option("kafka.sasl.mechanism", mech)
+                jaas = f"org.apache.kafka.common.security.plain.PlainLoginModule required username=\"{user}\" password=\"{pwd}\";"
+                writer = writer.option("kafka.sasl.jaas.config", jaas)
 
         writer.mode("append").save()
 
