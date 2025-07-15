@@ -60,6 +60,9 @@ def main():
     ssl_cafile = os.getenv("KAFKA_SSL_CAFILE")
     ssl_certfile = os.getenv("KAFKA_SSL_CERTFILE")
     ssl_keyfile = os.getenv("KAFKA_SSL_KEYFILE")
+    sasl_mechanism = os.getenv("KAFKA_SASL_MECHANISM")
+    username = os.getenv("KAFKA_USERNAME")
+    password = os.getenv("KAFKA_PASSWORD")
     try:
         producer = KafkaProducer(
             bootstrap_servers=[args.kafka_broker],
@@ -71,7 +74,10 @@ def main():
             security_protocol=security_protocol,
             ssl_cafile=ssl_cafile,
             ssl_certfile=ssl_certfile,
-            ssl_keyfile=ssl_keyfile
+            ssl_keyfile=ssl_keyfile,
+            sasl_mechanism=sasl_mechanism,
+            sasl_plain_username=username,
+            sasl_plain_password=password
         )
     except Exception as e:
         print(f"Erreur lors de la connexion à Kafka: {e}")
