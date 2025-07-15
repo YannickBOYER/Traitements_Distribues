@@ -115,7 +115,7 @@
             "uid": "PBFA97CFB590B2093"
           },
           "editorMode": "code",
-          "expr": "sum(rate(kafka_topic_partition_current_offset{}[1m])) by (topic)",
+          "expr": "sum(rate(kafka_topic_partition_current_offset{instance=~'$instance',topic=~\"$topic\"}[1m])) by (topic)",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "{{topic}}",
