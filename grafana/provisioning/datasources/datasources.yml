@@ -16,5 +16,5 @@ datasources:
     jsonData:
       kafkaVersion: "2.7.0"
       securityProtocol: SSL
-      bootstrapServers: kafka:9093
+      bootstrapServers: kafka:9092
     editable: true

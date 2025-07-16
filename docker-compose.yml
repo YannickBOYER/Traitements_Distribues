@@ -21,12 +21,13 @@ services:
       - zookeeper
     ports:
       - "9093:9093"
+      - "9092:9092"
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: SSL://kafka:9093
-      KAFKA_LISTENERS: SSL://0.0.0.0:9093
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: SSL:SSL
+      KAFKA_ADVERTISED_LISTENERS: SSL://kafka:9093,PLAINTEXT://kafka:9092
+      KAFKA_LISTENERS: SSL://0.0.0.0:9093,PLAINTEXT://0.0.0.0:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: SSL:SSL,PLAINTEXT:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: SSL
       KAFKA_SSL_KEYSTORE_FILENAME: server.keystore.jks
       KAFKA_SSL_TRUSTSTORE_FILENAME: server.truststore.jks
@@ -200,6 +201,7 @@ services:
       - ./grafana/dashboards:/etc/grafana/provisioning/dashboards/dashboards
       - ./grafana/provisioning/alerting:/etc/grafana/provisioning/alerting
       - ./certs/grafana:/certs/grafana:ro
+      - ./certs/kafka:/certs/kafka:ro
     networks:
       - traitements_distrib
 
